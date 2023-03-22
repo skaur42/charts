@@ -1,1 +1,115 @@
+<html>
+<head>
+<style>
+    body    {white-space: nowrap}              
+    #chart  {position:absolute; left:95px; width:500px; height:300px; border:1px solid gray}  /*Width should be 200 > height    */
+    #canvas {float:left}                                                                      /*Align the canvas to the left    */
+    #legend {padding-left:320px}                                                              /*Should be the canvas width + 20 */                         
+</style>
 
+<body bgcolor=lightyellow>
+<script src=chartPie.js>    </script>
+<script src=chartBar.js>    </script>
+<script src=chartLine.js>   </script>
+<script src=chartBubble.js> </script>
+<script src=chartScatter.js></script>
+
+<h1>Charting using Canvas</h1>
+
+<table width=800>
+<tr><td valign=top><b>Data Points<br>
+    <br><input type=button value="  Another  " onclick=createData();chartIt(lastType)> 
+    <td><textarea id=dataPoints style='height:65px; width:500px' onChange=chartIt()> </textarea>
+    <td valign=top width=200><i>- name=value1,value2,... <br>- semi colon delimited<br>- max 12 data points
+<tr><td>
+    <td><img src=pie.jpg     border=1 height=30 width=30 onclick="chartIt('pie')">
+        <img src=bar.jpg     border=1 height=30 width=30 onclick="chartIt('bar')">
+        <img src=line.jpg    border=1 height=30 width=30 onclick="chartIt('line')">
+        <img src=bubble.jpg  border=1 height=30 width=30 onclick="chartIt('bubble')">
+        <img src=scatter.jpg border=1 height=30 width=30 onclick="chartIt('scatter')">
+</table>
+
+<div id="chart" style='background-color:white'>
+    <canvas id="canvas" width=300 height=300></canvas>
+    <div id="legend"></div>
+</div>
+
+<script>
+
+createData();
+chartIt('pie');
+
+var lastType;
+
+//=======================================================================================================
+// Create random data points
+// 4 to 12 data points, each having 1 to 5 values, each value is 0 to 999
+// Display those values in the <textarea>
+//=======================================================================================================
+function createData()
+{
+    var dataPoints = '';
+
+    var tot_dataPoints = Math.floor(Math.random()*9) + 4;      		//random number 4-12
+    var tot_values     = Math.floor(Math.random()*5) + 1;     		//random number 1-5
+
+    for (var i=0; i < tot_dataPoints; i++)
+    { 
+        dataPoints += 'label' + (i+1) + '=';						//append the label
+        var value = 0;
+        for (var j=0; j < tot_values; j++)
+        { 
+            value      += Math.floor(Math.random()*200);     		//random number 4 * 200
+            dataPoints += value;									//append the value
+            if (j<tot_values-1) dataPoints += ',';                  //no comma after last value
+        }          
+        dataPoints += '; ';             							//add semi-colon         
+    }    
+    document.getElementById('dataPoints').value = dataPoints;
+}
+//=======================================================================================================
+// Chart allows up to 12 data points (1 data point per 25px of canvas height)
+// Must provide: data object (name/value pairs)
+// Must provide: canvas for charting, and div for legend (labels)
+//=======================================================================================================
+function chartIt(chartType)
+{
+    var data    = [];                                       
+    var labels  = [];
+
+    var dataPoints = document.getElementById('dataPoints').value;	//obtain the entered data points 
+        dataPoints = dataPoints.replace(/;/g    , '; ');			//must have space after each each '; '
+        dataPoints = dataPoints.replace(/;\s*$/ , '');				//eliminate last ';' if any
+
+    var points     = dataPoints.split('; ');
+
+    for (var i=0; i < points.length; i++)
+    { 
+        if (points[i] == '') break;                     //prevents empty elements when extra semi colons
+        var nameValue = points[i].split('=');
+        var name      = nameValue[0];
+        var values    = nameValue[1].split(',');		//create an array of values for each data point        
+        for (var j=0; j < values.length; j++)
+            values[j] = Number(values[j]);				//convert string to number
+        data[name]    = values;              			//create object of name/value pairs
+    }    
+   
+    if (chartType=='bar')
+        drawBarChart(data,'canvas','legend');
+    if (chartType=='pie')
+        drawPieChart(data,'canvas','legend');
+    if (chartType=='line')
+        drawLineChart(data,'canvas','legend');
+    if (chartType=='bubble')
+        drawBubbleChart(data,'canvas','legend');
+    if (chartType=='scatter')
+        drawScatterChart(data,'canvas','legend');
+        
+    lastType=chartType;    
+ 
+}
+//=======================================================================================================
+</script>
+
+</body>
+</html>
