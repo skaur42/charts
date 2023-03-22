@@ -20,3 +20,311 @@
     <script src=chartScatter.js>  </script>
     <script src=dump.js>  </script>
     
+<style>
+        @import url("database/table.css"); 
+        body       {white-space: nowrap}
+        select     {width:150px;}              
+        #database  {position:absolute; top:72px;  left:710px; }
+        #divTable  {position:absolute; top:190px; left:100px; height:250px; width:600px; border:2px solid lightgray; background-color:white;} 
+        #chartType {position:absolute; top:450px; left:100px; }
+        #message   {position:absolute; top:455px; left:560px; }
+        #chart     {position:absolute; top:490px; left:100px; height:300px; width:600px; border:2px solid lightgray}  
+        #fields    {position:absolute; top:490px; left:710px; } 
+        #canvas    {float:left}
+        #legend    {padding-left:320px}                                                                                        
+        #connect   {visibility:hidden}
+    </style>
+</head>
+<body bgcolor=lightyellow>
+  <h2>Read from Database using AJAX Web Service and Chart It</h2>
+  
+  <table>
+    <tbody>
+        <tr>
+            <td>Enter SQL.... <br>
+                &nbsp;&nbsp;&nbsp;or JSON....<br><br>
+                <a href=examples.html target=_blank><i>examples</i></a></td>
+            <td><textarea id="_sql" style='height:74px; width:595px' wrap="off"></textarea>
+        </tr>
+        <tr>
+            <td></td>
+            <td><input type="submit" value="      Execute      " onClick="doRequest()"> &nbsp;
+                <input type="radio"  name="db" id="demo"  checked 
+                       onClick="document.getElementById('connect').style.visibility='hidden'; doRequest()"> Demo Database 
+                <input type="radio"  name="db" id="demods"         
+                       onClick="document.getElementById('connect').style.visibility='hidden'; doRequest()"> Demo ODS 
+                <input type="radio"  name="db" id="demodw"        
+                       onClick="document.getElementById('connect').style.visibility='hidden'; doRequest()"> Demo Data Warehouse 
+                <input type="radio"  name="db" id="other" 
+                       onClick="document.getElementById('connect').style.visibility='visible'">Other &nbsp;
+
+               <span id="connect">
+                   <input type="text"     id="user"   size=5 placeholder='user'>   &nbsp;
+                   <input type="password" id="pswd"   size=5 placeholder='pswd'>   &nbsp;  
+               </span>
+         </tr>
+    </tbody>
+  </table>
+
+  <div id="database"><select id="dbtype" style='width:70px'>
+                        <option value='mysql' selected> Mysql </option>
+                        <option value='oracle'>         Oracle</option>
+                    </select>      
+           <br><br><input type="checkbox" id="seeJSON">see returned JSON
+ </div>
+
+  <div id="divTable"></div>
+
+  <div id="chartType">
+      <img src=bar.jpg     border=1 height=30 width=30 onclick="chartIt('bar')">
+      <img src=pie.jpg     border=1 height=30 width=30 onclick="chartIt('pie')">
+      <img src=line.jpg    border=1 height=30 width=30 onclick="chartIt('line')">
+      <img src=bubble.jpg  border=1 height=30 width=30 onclick="chartIt('bubble')">
+      <img src=scatter.jpg border=1 height=30 width=30 onclick="chartIt('scatter')">
+  </div>
+  
+  <div id="message">
+      <i>(Maximum 12 Rows)</i> 
+  </div>
+
+  <div id="chart" style='background-color:white'>
+      <canvas id="canvas" width=300 height=300></canvas>
+      <div id="legend"></div>
+  </div>
+
+  <div id="fields"></div>
+
+<script>
+//=================================================================================================
+lastType  = 'bar';                                                      //start with bar chart                                                      
+
+doRequest()
+//=================================================================================================
+// doRequest: process the request at beginning and when execute button is clicked
+//=================================================================================================
+function doRequest() 
+{   
+    if (document.getElementById('demo').checked)                        //which database?
+    {
+        var connect = "user=demo&pswd=demo";
+        var db      = "demo";
+    }
+    if (document.getElementById('demods').checked)
+    {              
+        var connect = "user=demods&pswd=demods";      
+        var db      = "demods";
+    }
+    if (document.getElementById('demodw').checked)
+    {              
+        var connect = "user=demodw&pswd=demodw";      
+        var db      = "demodw";
+    }
+    if (document.getElementById('other').checked)
+    {        
+        var connect =  "user="   + document.getElementById('user').value
+                    + "&pswd="   + document.getElementById('pswd').value;
+        var db      = document.getElementById('user').value 
+    }     
+
+    if (document.getElementById('dbtype').value == 'mysql') 
+        connect += '&dbtype=mysql&db=' + db;
+    else 
+        connect += '&dbtype=oracle&db=ORCL';
+
+    var sql = document.getElementById("_sql").value;            //get search string entered in the form    
+
+    if (!sql)                                                   //get list of tables 
+        if (document.getElementById('dbtype').value == 'mysql') 
+            sql = 'show tables';
+        else 
+            sql = 'select table_name from user_tables';
+
+    sql = sql.replace(/;\s*$/ , '');                            //eliminate last ';' if any
+
+    if (sql.match(/^\s*(select|with|show|desc)/i) )             //if entry is 'select','with','show' or 'desc' 
+    {
+        sql = escape(sql);                                      //URL encode the sql
+        var param = connect +"&sql="+ sql +"&format=json";      //create "db=...&sql=...&format=json"      
+        var callback = doResponse;                              //setup a callback function
+        ajaxRequest(url, "GET", param, callback);               //call ajax request 
+    } 
+    else
+    {
+        alert('assuming JSON')                                  //assume entry is JSON
+        json = sql        
+        doResponse(json,'',json,'')                             //continue processing
+    }
+}
+
+//========================================================================================
+// doResponse: receives the ajax response in all the following formats:
+//             respText - the response as a text format. Also used for HTML 
+//             respXML  - the response as an XML DOM object
+//             respJSON - the response as a JSON object
+//             respHeaders - All response headers as a single string 
+//========================================================================================
+function doResponse(respText, respXML, respJSON, respHeaders)
+{
+    if (document.getElementById('seeJSON').checked)
+        alert(respText);
+
+    try {
+        var json = JSON.parse(respText);        //convert returned text to JSON array of objects
+    }
+    catch(ex) {
+       alert('Bad JSON string: \n' + ex)        //display JSON parse error
+    }
+       
+    headers = [];                               //global array for headers
+    data2   = [];                               //global 2 dimensional array for data
+
+                                                //convert json into headers array and 2 dim data array
+    for (var i=0; i < json.length; i++)         //loop through the outer json array 
+    {
+        var j = 0;
+        var array = [];                         
+        var obj   = json[i];                    //each json line is an object
+        for (prop in obj)                       //loop through the inner json object                        
+        {
+            headers[j] = prop;                  //property name
+            array[j]   = obj[prop]              //property value
+            j++;
+        }
+        data2[i] = array;                       //build 2 dimensional data array
+    }     
+
+    var dataCopy = data2.slice(0);              //copy the array (so any Table sort not effect order of values)  
+
+    Table(headers, dataCopy, -1, 'asc')         //call table.js to display 
+  
+    display_fields(headers);                    //call display_fields
+
+    chartIt(lastType);                          //call chartIt
+}
+
+//===================================================================================================
+// Display a list of column names in checkboxes
+// Check the first dimension (non numeric) and the first measure (numeric)   
+//===================================================================================================
+function display_fields()
+{
+    var col;
+    var alpha   = false
+    var numeric = false
+    for (col=0; col<headers.length; col++)               //check to see if there is an alpha column
+        if (isNaN(data2[0][col]))
+            alpha = true;
+    for (col=0; col<headers.length; col++)               //check to see if there is a numeric column
+        if (!isNaN(data2[0][col]))
+            numeric = true;
+            
+    if (!alpha)                                         //if there are no alpha columns
+    {    
+        headers[col] = 'DimX';                          //add an alpha column header
+        for (var i=0; i < data2.length; i++)            //loop thru the rows
+            data2[i][col] = 'X';                        //add an alpha column as last column
+    }
+    if (!numeric)                                       //if there are no numeric columns
+    {    
+        headers[col] = 'Num';                           //add a numeric column header
+        for (var i=0; i < data2.length; i++)            //loop thru the rows
+            data2[i][col] = i+1;                        //add a numeric column as last column
+    }
+
+    var dims = '<b>Attributes </b><br> <select id=dims size=8 onChange=chartIt(lastType) >';
+    for (i=0; i<headers.length; i++)
+    {        
+        if (isString(data2[0][i]) && isNaN(data2[0][i]))                    //if string
+            dims += "<option id=d" + i + "> "+ headers[i] + "</option>";    
+    }
+    dims += '</select><br>';
+
+    var facts = '<b>Facts/Measures </b><br> <select id=facts size=7 onChange=chartIt(lastType) >';
+    for (i=0; i<headers.length; i++)
+    {
+        if (! isNaN(data2[0][i]))                                           //if numeric                                        
+            facts += "<option id=f" + i + "> "+ headers[i] +"</option>";    
+    }
+    facts += '</select>';
+
+    document.getElementById('fields').innerHTML = dims + facts;
+
+    for (i=0; i<headers.length; i++)
+        if (isString(data2[0][i]) && isNaN(data2[0][i]))                //if string
+        {
+            document.getElementById('d'+i).selected = true;             //select the first dimension
+            break;
+        }
+    for (i=0; i<headers.length; i++)
+        if (!isNaN(data2[0][i]))										//if numeric
+        {
+            document.getElementById('f'+i).selected = true;             //select the first fact/measure
+            break;
+        }
+}
+//===================================================================================================
+// Test for a string  
+//===================================================================================================
+function isString (obj) 
+{
+  return (Object.prototype.toString.call(obj) === '[object String]');
+}
+//===================================================================================================
+// Chart a 2 dimensional array.  
+// Array columns: col 1 for labels, column 2 or 3 must be numeric
+// Array rows:    maximum = 12 rows 
+//===================================================================================================
+function chartIt(chartType)
+{
+    var dataObj = {};                                   //object to chart {label1:[val1,val2,val3], label2:[...]}
+             
+//  if (document.getElementById('dims').length ==0 || 
+//      document.getElementById('facts').length==0)
+//          alert('Must have at least one dimension and one measure column for chart');
+
+    var i     = document.getElementById('dims').selectedIndex       //the chosen dimension
+    var dimId = document.getElementById('dims')[i].id               //the id of the chosen dimension 
+    var dim   = dimId.substr(1);                                    //get rid of the leading "d" 
+
+    var j      = document.getElementById('facts').selectedIndex     //the chosen fact
+    var factId = document.getElementById('facts')[j].id             //the id of the chosen fact 
+    var fact   = factId.substr(1);                                  //get rid of the leading "f" 
+
+    var prev_label = '';                            
+    var values     = [];                            //array to hold all the values for the same data point (col 1)
+
+    for (var i=0; i < data2.length; i++)            //pivot data from rows to columns (based on value of col 1)
+    {                                
+        if (Object.keys(dataObj).length >= 12)      //graph can only process 12 data points (300px/25) 
+            break;    
+
+        var label = data2[i][dim];                  //use the dimension for label
+        var value = 0;
+            value = Number(data2[i][fact]);         //use the fact for the value 
+
+        if (! dataObj[label])
+            dataObj[label] = new Array();            
+        values = dataObj[label];                    //get the value array
+        values.push(value);                         //add the new value to the array
+        dataObj[label] = new Array()
+        dataObj[label] = values;                    //add the array to the object
+
+        
+    }
+    
+    if (chartType=='bar')
+        drawBarChart(dataObj,'canvas','legend');
+    if (chartType=='pie')
+        drawPieChart(dataObj,'canvas','legend');
+    if (chartType=='line')
+        drawLineChart(dataObj,'canvas','legend');
+    if (chartType=='bubble')
+        drawBubbleChart(dataObj,'canvas','legend');
+    if (chartType=='scatter')
+        drawScatterChart(dataObj,'canvas','legend');
+        
+    lastType = chartType;                               //save the last chart type
+}
+ 
+</script>
+</body>
